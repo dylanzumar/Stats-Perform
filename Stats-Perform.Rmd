@@ -1,0 +1,229 @@
+---
+title: "Stats Perform"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+```{r load-libraries}
+library("dplyr")
+library("ggplot2")
+library("broom")
+library("knitr")
+library("cowplot")
+library("readr")
+library("arm")
+library("olsrr")
+library("caret")
+library("tidyr")
+library("car")
+library("ggrepel")
+library("infer")
+library("plotROC")
+library("pROC")
+```
+
+##Read File
+
+```{r data}
+nba <- read.csv("nba_pbp.csv")
+glimpse(nba)
+```
+
+
+##Create Difference Variables
+
+```{r differentiate-variables}
+nba <- nba %>%
+  mutate(HT_FOUL_DIFF = HT_FOUL - AT_FOUL,
+         HT_ORBD_DIFF = HT_ORBD - AT_ORBD,
+         HT_DRBD_DIFF = HT_DRBD - AT_DRBD,
+         HT_TRBD_DIFF = HT_TRBD - AT_TRBD,
+         HT_AST_DIFF = HT_AST - AT_AST,
+         HT_STL_DIFF = HT_STL - AT_STL,
+         HT_BLK_DIFF = HT_BLK - AT_BLK,
+         HT_TOV_DIFF = HT_TOV - AT_TOV,
+         )
+```
+
+```{r select-pertinent-variables}
+filtered <- nba %>%
+  dplyr::select(GAME_NUM, OUTCOME, HT_FOUL_DIFF, HT_ORBD_DIFF, HT_DRBD_DIFF, HT_TRBD_DIFF,
+                HT_AST_DIFF, HT_STL_DIFF, HT_BLK_DIFF, HT_TOV_DIFF, GAME_TIME, HT_SCORE_DIFF)
+```
+
+##Exploratory Data Analysis
+
+```{r binned-plots}
+arm::binnedplot(x = filtered$HT_FOUL_DIFF, y = filtered$OUTCOME, 
+                xlab = "Foul Differential",
+                ylab = "Outcome",
+                main = "Foul Differential vs. Outcome", 
+                col.int = "white" #remove intervals
+                )
+arm::binnedplot(x = filtered$HT_ORBD_DIFF, y = filtered$OUTCOME, 
+                xlab = "Offensive Rebound Differential",
+                ylab = "Outcome",
+                main = "Offensive Rebound vs. Outcome", 
+                col.int = "white" #remove intervals
+                )
+arm::binnedplot(x = filtered$HT_DRBD_DIFF, y = filtered$OUTCOME, 
+                xlab = "Defensive Rebound Differential",
+                ylab = "Outcome",
+                main = "Defensive Rebound vs. Outcome", 
+                col.int = "white" #remove intervals
+                )
+arm::binnedplot(x = filtered$HT_TRBD_DIFF, y = filtered$OUTCOME, 
+                xlab = "Total Rebound Differential",
+                ylab = "Outcome",
+                main = "Total Rebound vs. Outcome", 
+                col.int = "white" #remove intervals
+                )
+arm::binnedplot(x = filtered$HT_AST_DIFF, y = filtered$OUTCOME, 
+                xlab = "Assist Differential",
+                ylab = "Outcome",
+                main = "Assist vs. Outcome", 
+                col.int = "white" #remove intervals
+                )
+arm::binnedplot(x = filtered$HT_STL_DIFF, y = filtered$OUTCOME, 
+                xlab = "Steal Differential",
+                ylab = "Outcome",
+                main = "Steal vs. Outcome", 
+                col.int = "white" #remove intervals
+                )
+arm::binnedplot(x = filtered$HT_BLK_DIFF, y = filtered$OUTCOME, 
+                xlab = "Block Differential",
+                ylab = "Outcome",
+                main = "Block vs. Outcome", 
+                col.int = "white" #remove intervals
+                )
+arm::binnedplot(x = filtered$HT_TOV_DIFF, y = filtered$OUTCOME, 
+                xlab = "Turnover Differential",
+                ylab = "Outcome",
+                main = "Turnover vs. Outcome", 
+                col.int = "white" #remove intervals
+                )
+arm::binnedplot(x = filtered$GAME_TIME, y = filtered$OUTCOME, 
+                xlab = "Game Time",
+                ylab = "Outcome",
+                main = "Game Time vs. Outcome", 
+                col.int = "white" #remove intervals
+                )
+arm::binnedplot(x = filtered$HT_SCORE_DIFF, y = filtered$OUTCOME, 
+                xlab = "Total Score Differential",
+                ylab = "Outcome",
+                main = "Total Score vs. Outcome", 
+                col.int = "white" #remove intervals
+                )
+```
+
+
+##Model Creation
+
+```{r base-model}
+model.base <- glm(OUTCOME ~ HT_SCORE_DIFF + HT_FOUL_DIFF + HT_ORBD_DIFF + HT_DRBD_DIFF + HT_TRBD_DIFF + HT_AST_DIFF + HT_STL_DIFF + HT_BLK_DIFF + HT_TOV_DIFF + GAME_TIME, family=binomial,data=filtered)
+
+step(model.base, direction = "backward")
+
+model.full <- glm(formula = OUTCOME ~ HT_SCORE_DIFF + HT_FOUL_DIFF + HT_ORBD_DIFF + 
+    HT_DRBD_DIFF + HT_AST_DIFF + HT_STL_DIFF + HT_BLK_DIFF + 
+    HT_TOV_DIFF + GAME_TIME + HT_SCORE_DIFF*GAME_TIME + HT_FOUL_DIFF*GAME_TIME + HT_ORBD_DIFF*GAME_TIME + HT_DRBD_DIFF*GAME_TIME + HT_TRBD_DIFF*GAME_TIME + HT_AST_DIFF*GAME_TIME + HT_STL_DIFF*GAME_TIME + HT_BLK_DIFF*GAME_TIME, family=binomial,data=nba)
+```
+
+```{r model-with-other-interactions}
+model.full.interaction <- glm(formula = OUTCOME ~ HT_SCORE_DIFF + HT_FOUL_DIFF + HT_ORBD_DIFF + 
+    HT_DRBD_DIFF + HT_TRBD_DIFF + HT_AST_DIFF + HT_STL_DIFF + HT_BLK_DIFF + 
+    HT_TOV_DIFF + GAME_TIME + HT_SCORE_DIFF*GAME_TIME + HT_FOUL_DIFF*GAME_TIME + HT_ORBD_DIFF*GAME_TIME + HT_DRBD_DIFF*GAME_TIME + HT_TRBD_DIFF*GAME_TIME + HT_AST_DIFF*GAME_TIME + HT_STL_DIFF*GAME_TIME + HT_BLK_DIFF*GAME_TIME + HT_TOV_DIFF*GAME_TIME + HT_STL_DIFF*HT_FOUL_DIFF + HT_AST_DIFF*HT_TOV_DIFF, family=binomial,data=nba)
+kable(anova(model.full,model.full.interaction,test="Chisq"),format="html")
+```
+
+##Final Model
+
+```{r final-model-creation}
+model.final <- glm(formula = OUTCOME ~ HT_SCORE_DIFF + HT_FOUL_DIFF + HT_ORBD_DIFF + 
+    HT_DRBD_DIFF + HT_TRBD_DIFF + HT_AST_DIFF + HT_STL_DIFF + HT_BLK_DIFF + 
+    HT_TOV_DIFF + GAME_TIME + HT_SCORE_DIFF*GAME_TIME + HT_FOUL_DIFF*GAME_TIME + HT_ORBD_DIFF*GAME_TIME + HT_DRBD_DIFF*GAME_TIME + HT_TRBD_DIFF*GAME_TIME + HT_AST_DIFF*GAME_TIME + HT_STL_DIFF*GAME_TIME + HT_BLK_DIFF*GAME_TIME + HT_TOV_DIFF*GAME_TIME + HT_STL_DIFF*HT_FOUL_DIFF + HT_AST_DIFF*HT_TOV_DIFF, family=binomial,data=nba)
+
+kable(tidy(model.final))
+
+filtered <- filtered %>%
+  mutate(predicted = fitted(model.final),
+         residuals = resid(model.final))
+```
+
+##Assessing model fit
+
+```{r ROC-and-binned-residuals}
+roc(filtered$OUTCOME, filtered$predicted, plot = TRUE, legacy.axes = TRUE, print.auc = TRUE)
+
+arm::binnedplot(x=filtered$predicted,y=filtered$residuals,xlab="Predicted Probabilities", 
+                main = "Binned Residual vs. Predicted Values")
+
+arm::binnedplot(x=filtered$HT_SCORE_DIFF,y=filtered$residuals,xlab="Score Differential", 
+                main = "Binned Residual vs. Score Differential")
+
+arm::binnedplot(x=filtered$HT_FOUL_DIFF,y=filtered$residuals,xlab="Foul Differential", 
+                main = "Binned Residual vs. Foul Differential")
+
+arm::binnedplot(x=filtered$HT_ORBD_DIFF,y=filtered$residuals,xlab="Offensive Rebound Differential", 
+                main = "Binned Residual vs. Offensive Rebound Differential")
+
+arm::binnedplot(x=filtered$HT_DRBD_DIFF,y=filtered$residuals,xlab="Defensive Rebound Differential", 
+                main = "Binned Residual vs. Defensive Rebound Differential")
+
+arm::binnedplot(x=filtered$HT_TRBD_DIFF,y=filtered$residuals,xlab="Total Rebound Differential", 
+                main = "Binned Residual vs. Total Rebound Differential")
+
+arm::binnedplot(x=filtered$HT_AST_DIFF,y=filtered$residuals,xlab="Assist Differential", 
+                main = "Binned Residual vs. Assist Differential")
+
+arm::binnedplot(x=filtered$HT_STL_DIFF,y=filtered$residuals,xlab="Steal Differential", 
+                main = "Binned Residual vs. Steal Differential")
+
+arm::binnedplot(x=filtered$HT_BLK_DIFF,y=filtered$residuals,xlab="Block Differential", 
+                main = "Binned Residual vs. Block Differential")
+
+arm::binnedplot(x=filtered$HT_TOV_DIFF,y=filtered$residuals,xlab="Turnover Differential", 
+                main = "Binned Residual vs. Turnover Differential")
+```
+
+```{r observations}
+filtered %>%
+  group_by(GAME_NUM) %>%
+  arrange(desc(predicted)) %>%
+  slice(1) %>%
+  arrange(desc(predicted)) %>%
+  head(10) %>%
+  dplyr::select(GAME_NUM, OUTCOME, GAME_TIME, HT_SCORE_DIFF, predicted)
+
+filtered %>%
+  group_by(GAME_NUM) %>%
+  arrange(desc(predicted)) %>%
+  slice(1) %>%
+  arrange(desc(predicted)) %>%
+  filter(OUTCOME == 0) %>%
+  head(10) %>%
+  dplyr::select(GAME_NUM, OUTCOME, GAME_TIME, HT_SCORE_DIFF, predicted)
+
+filtered %>%
+  group_by(GAME_NUM) %>%
+  arrange(predicted) %>%
+  slice(1) %>%
+  arrange(predicted) %>%
+  head(10) %>%
+  dplyr::select(GAME_NUM, OUTCOME, GAME_TIME, HT_SCORE_DIFF, predicted)
+
+filtered %>%
+  group_by(GAME_NUM) %>%
+  arrange(predicted) %>%
+  slice(1) %>%
+  arrange(predicted) %>%
+  filter(OUTCOME == 1) %>%
+  head(10) %>%
+  dplyr::select(GAME_NUM, OUTCOME, GAME_TIME, HT_SCORE_DIFF, predicted)
+```
+
