@@ -1,6 +1,9 @@
 Stats Perform Data Evaluation
 by: Dylan Zumar (Duke University Class of 2021)
 
+.git reposity HTTPS:
+https://github.com/dylanzumar/Stats-Perform.git
+
 Environment Used: RStudio
 
 platform       x86_64-pc-linux-gnu         
